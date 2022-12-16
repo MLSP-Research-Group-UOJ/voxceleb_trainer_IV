@@ -166,11 +166,20 @@ class ModelTrainer(object):
 
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=nDataLoaderThread, drop_last=False, sampler=sampler)
 
-        ## Extract features for every image
+        ## Extract features for every image --Modified by Dimuthu Anuraj--
+        em2 = numpy.empty([1, 512], dtype=float) #added by @dimuthuanuraj
         for idx, data in enumerate(test_loader):
             inp1 = data[0][0].cuda()
             with torch.no_grad():
                 ref_feat = self.__model__(inp1).detach().cpu()
+
+            em = numpy.array(ref_feat) #added by @dimuthuanuraj
+            em2 = numpy.vstack([em2, em]) #added by @dimuthuanuraj
+            print(ref_feat)
+            print(idx)
+            print(data)
+            print(ref_feat.shape)
+
             feats[data[1][0]] = ref_feat
             telapsed = time.time() - tstart
 
