@@ -26,7 +26,7 @@ parser.add_argument('--config',         type=str,   default=None,   help='Config
 
 ## Data loader
 parser.add_argument('--max_frames',     type=int,   default=200,    help='Input length to the network for training')
-parser.add_argument('--eval_frames',    type=int,   default=300,    help='Input length to the network for testing 0 uses the whole files')
+parser.add_argument('--eval_frames',    type=int,   default=0,    help='Input length to the network for testing 0 uses the whole files')
 parser.add_argument('--batch_size',     type=int,   default=200,    help='Batch size, number of speakers per batch')
 parser.add_argument('--max_seg_per_spk', type=int,  default=500,    help='Maximum number of utterances per speaker per epoch')
 parser.add_argument('--nDataLoaderThread', type=int, default=5,     help='Number of loader threads')
@@ -34,7 +34,7 @@ parser.add_argument('--augment',        type=bool,  default=False,  help='Augmen
 parser.add_argument('--seed',           type=int,   default=10,     help='Seed for the random number generator')
 
 ## Training details
-parser.add_argument('--test_interval',  type=int,   default=10,     help='Test and save every [test_interval] epochs')
+parser.add_argument('--test_interval',  type=int,   default=1,     help='Test and save every [test_interval] epochs')
 parser.add_argument('--max_epoch',      type=int,   default=500,    help='Maximum number of epochs')
 parser.add_argument('--trainfunc',      type=str,   default="",     help='Loss function')
 
@@ -63,15 +63,33 @@ parser.add_argument('--initial_model',  type=str,   default="",     help='Initia
 parser.add_argument('--save_path',      type=str,   default="exps/exp1", help='Path for model and logs')
 
 ## Training and test data
-parser.add_argument('--train_list',     type=str,   default="data/train_list.txt",  help='Train list')
-parser.add_argument('--test_list',      type=str,   default="data/test_list.txt",   help='Evaluation list')
+
+#Updated training data locations
+#training english
+parser.add_argument('--train_list',     type=str,   default="lists/train_list_E.txt",  help='Train list')
 parser.add_argument('--train_path',     type=str,   default="data/voxceleb2", help='Absolute path to the train set')
-parser.add_argument('--test_path',      type=str,   default="data/voxceleb1", help='Absolute path to the test set')
-parser.add_argument('--musan_path',     type=str,   default="data/musan_split", help='Absolute path to the test set')
-parser.add_argument('--rir_path',       type=str,   default="data/RIRS_NOISES/simulated_rirs", help='Absolute path to the test set')
+
+##training Tamil
+#parser.add_argument('--train_list',     type=str,   default="lists/train_list_tamil.txt",  help='Train list')
+#parser.add_argument('--train_path',     type=str,   default="data/Tamil_train", help='Absolute path to the train set')
+#
+##testing tamil
+#parser.add_argument('--test_path',     type=str,   default="data/Tamil_test",  help='test path')
+#parser.add_argument('--test_list',     type=str,   default="lists/test_list_tamil.txt",   help='Evaluation list')
+#
+##testing Sinhala
+#parser.add_argument('--test_path',     type=str,   default="data/Sinhala_test",  help='test path')
+#parser.add_argument('--test_list',     type=str,   default="lists/test_list_sinhala.txt",   help='Evaluation list')
+
+#testing English
+parser.add_argument('--test_path',     type=str,   default="data/voxceleb1",  help='test path')
+parser.add_argument('--test_list',      type=str,   default="lists/test_list_english.txt",   help='Evaluation list')
+
+#parser.add_argument('--musan_path',     type=str,   default="data/musan_split", help='Absolute path to the test set')
+#parser.add_argument('--rir_path',       type=str,   default="data/RIRS_NOISES/simulated_rirs", help='Absolute path to the test set')
 
 ## Model definition
-parser.add_argument('--n_mels',         type=int,   default=40,     help='Number of mel filterbanks')
+parser.add_argument('--n_mels',         type=int,   default=128,     help='Number of mel filterbanks')
 parser.add_argument('--log_input',      type=bool,  default=False,  help='Log input features')
 parser.add_argument('--model',          type=str,   default="",     help='Name of model definition')
 parser.add_argument('--encoder_type',   type=str,   default="SAP",  help='Type of encoder')
