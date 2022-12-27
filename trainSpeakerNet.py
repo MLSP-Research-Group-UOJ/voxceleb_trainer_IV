@@ -99,6 +99,10 @@ parser.add_argument('--sinc_stride',    type=int,   default=10,    help='Stride 
 ## For test only
 parser.add_argument('--eval',           dest='eval', action='store_true', help='Eval only')
 
+## For xvector extraction only - added by @dimuthuanuraj
+parser.add_argument('--extract',           dest='extract', action='store_false', help='For xvector extraction');
+
+
 ## Distributed and mixed precision training
 parser.add_argument('--port',           type=str,   default="8888", help='Port for distributed training, input as text')
 parser.add_argument('--distributed',    dest='distributed', action='store_true', help='Enable distributed training')
@@ -210,6 +214,15 @@ def main_worker(gpu, ngpus_per_node, args):
             print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "VEER {:2.4f}".format(result[1]), "MinDCF {:2.5f}".format(mindcf))
 
         return
+
+    ## r-vector extraction method :- added by @dimuthuanuraj
+    if args.extract == True:
+        pytorch_total_params = sum(p.numel() for p in s.module.__S__.parameters())
+
+        print('Total parameters: ', pytorch_total_params)
+        print('Train list', args.train_list)
+
+        trainer.rvector_extraction(**vars(args))
 
     ## Save training code and params
     if args.gpu == 0:
