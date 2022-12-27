@@ -100,6 +100,9 @@ class ModelTrainer(object):
             if self.mixedprec:
                 with autocast():
                     nloss, prec1 = self.__model__(data, label)
+                    print("label - ", label) #added by @dimuthuanuraj
+                    print("data - ", data) #added by @dimuthuanuraj
+                    
                 self.scaler.scale(nloss).backward()
                 self.scaler.step(self.__optimizer__)
                 self.scaler.update()
@@ -132,6 +135,56 @@ class ModelTrainer(object):
     ## ===== ===== ===== ===== ===== ===== ===== =====
     ## Evaluate from list
     ## ===== ===== ===== ===== ===== ===== ===== =====
+
+    ## ===== ===== ===== ===== ===== ===== ===== =====
+    ## r-vector  from list
+    ## ===== ===== ===== ===== ===== ===== ===== =====
+    def rvector_extraction(self, train_list, train_path, nDataLoaderThread, distributed, **kwargs):
+
+        if distributed:
+            rank = torch.distributed.get_rank()
+        else:
+            rank = 0
+
+        self.__model__.eval();
+
+        lines = []
+        files = []
+        feats = {}
+        tstart = time.time()
+
+        ## Define common data loader
+        common_dataset = common_dataset_loader(train_list, train_path, **kwargs)
+
+        common_loader = torch.utils.data.DataLoader(
+            common_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=nDataLoaderThread,
+            drop_last=False,
+            sampler=None
+        )
+
+        for data, data_label in common_loader:
+            label = torch.LongTensor(data_label).cuda()
+            print("label is - ")  # added by dimuthuanuraj
+            print(label)
+            inp1 = data[0][0].cuda()
+            # print(idx,"\n")
+            # print(data[0][0])
+            with torch.no_grad():
+                ref_feat = self.__model__(inp1).detach().cpu()
+                # Modified code by Anuraj
+                # saving the embedding to npz format
+
+            # print(ref_feat)
+            em = numpy.array(ref_feat)
+            # print(idx)
+            # print(data)
+            # print(em.shape)
+            # print(ref_feat.shape)
+            em2 = numpy.vstack([em2, em])
+            # print("\n",em2.shape)
 
     def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10, **kwargs):
 
