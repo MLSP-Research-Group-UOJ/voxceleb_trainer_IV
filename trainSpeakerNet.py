@@ -215,15 +215,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
         return
 
-    ## r-vector extraction method :- added by @dimuthuanuraj
-    if args.extract == True:
-        pytorch_total_params = sum(p.numel() for p in s.module.__S__.parameters())
-
-        print('Total parameters: ', pytorch_total_params)
-        print('Train list', args.train_list)
-
-        trainer.rvector_extraction(**vars(args))
-
     ## Save training code and params
     if args.gpu == 0:
         pyfiles = glob.glob('./*.py')
