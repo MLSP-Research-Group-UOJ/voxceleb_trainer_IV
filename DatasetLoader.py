@@ -167,50 +167,6 @@ class train_dataset_loader(Dataset):
         return len(self.data_list)
 
 
-# Adding new type of dataloader for rvector extraction - @dimuthuanuraj
-class common_dataset_loader(Dataset):
-    def __init__(self, train_list, train_path, **kwargs):
-
-        self.train_list = train_list
-
-        # Read training files
-        with open(train_list) as dataset_file:
-            lines = dataset_file.readlines();
-
-        # Make a dictionary of ID names and ID indices
-        dictkeys = list(set([x.split()[0] for x in lines]))
-        dictkeys.sort()
-        dictkeys = {key: ii for ii, key in enumerate(dictkeys)}
-
-        # Parse the training list into file names and ID indices
-        self.data_list = []
-        self.data_label = []
-
-        for lidx, line in enumerate(lines):
-            data = line.strip().split();
-
-            speaker_label = dictkeys[data[0]];
-            filename = os.path.join(train_path, data[1]);
-
-            self.data_label.append(speaker_label)
-            self.data_list.append(filename)
-
-    def __getitem__(self, indices):
-
-        feat = []
-
-        for index in indices:
-            audio = loadWAV(self.data_list[index], self.max_frames, evalmode=False)
-            feat.append(audio);
-
-        feat = numpy.concatenate(feat, axis=0)
-
-        return torch.FloatTensor(feat), self.data_label[index]
-
-    def __len__(self):
-        return len(self.data_list)
-#
-
 class test_dataset_loader(Dataset):
     def __init__(self, test_list, test_path, eval_frames, num_eval, **kwargs):
         self.max_frames = eval_frames;
