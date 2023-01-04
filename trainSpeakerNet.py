@@ -215,6 +215,16 @@ def main_worker(gpu, ngpus_per_node, args):
 
         return
 
+    ## x-vector extraction - by dimuthuanuraj
+    if args.xtract == True:
+        pytorch_total_params = sum(p.numel() for p in s.module.__S__.parameters())
+
+        print('Total parameters: ', pytorch_total_params)
+        print('Test list', args.test_list)
+        print('Extracting embeddings from Test list', args.test_list)
+
+        trainer.extractXvectors(**vars(args))
+
     ## Save training code and params
     if args.gpu == 0:
         pyfiles = glob.glob('./*.py')
