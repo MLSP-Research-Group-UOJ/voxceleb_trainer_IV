@@ -242,6 +242,84 @@ class ModelTrainer(object):
         return (all_scores, all_labels, all_trials)
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
+    ## x vector extractor
+    ## ===== ===== ===== ===== ===== ===== ===== =====
+
+    def extractXvectors(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10,
+                        **kwargs):
+        if distributed:
+            rank = torch.distributed.get_rank()
+        else:
+            rank = 0
+
+        self.__model__.eval();
+
+        lines = []
+        files = []
+        feats = {}
+        tstart = time.time()
+
+        ## Read all lines
+        with open(test_list) as f:
+            lines = f.readlines()
+
+        ## Get a list of unique file names
+        files = list(itertools.chain(*[x.strip().split()[-2:] for x in lines]))
+        setfiles = list(set(files))
+        setfiles.sort()
+
+        ## Define test data loader
+        test_dataset = test_dataset_loader(setfiles, test_path, num_eval=num_eval, **kwargs)
+        print("Line number 174 - debug")
+        # print(test_dataset)
+
+        if distributed:
+            sampler = torch.utils.data.distributed.DistributedSampler(test_dataset, shuffle=False)
+        else:
+            sampler = None
+
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=nDataLoaderThread,
+            drop_last=False,
+            sampler=sampler
+        )
+
+        ## Extract features for every image
+        em2 = numpy.empty([1, 513], dtype=float)
+
+        feat_list = []
+        for idx, data in enumerate(test_loader):
+            inp1 = data[0][0].cuda()
+
+            with torch.no_grad():
+                ref_feat = self.__model__(inp1).detach().cpu()
+                speaker_id = int(
+                    (data[1][0].strip().split("/")[0]).lstrip('id'))  # extract the speaker id & append to list
+
+                em = numpy.array(ref_feat)
+                em = numpy.insert(em, 0, speaker_id,
+                                  axis=1)  # append the extract the x vector for perticular utterace with above speaker id
+
+            # Modified code by Anuraj
+            # saving the embedding to npz format
+            print(em.shape)
+            print(em2.shape)
+            em2 = numpy.vstack([em2, em])
+
+            telapsed = time.time() - tstart
+
+        # convert feat_list to numpy array
+        numpy.save('embeddings_English1.npy', em2)
+        print("Saved embeddings")
+        return None;
+    exit();
+
+
+
+    ## ===== ===== ===== ===== ===== ===== ===== =====
     ## Save parameters
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
