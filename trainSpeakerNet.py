@@ -27,7 +27,7 @@ parser.add_argument('--config',         type=str,   default=None,   help='Config
 ## Data loader
 parser.add_argument('--max_frames',     type=int,   default=200,    help='Input length to the network for training')
 parser.add_argument('--eval_frames',    type=int,   default=0,    help='Input length to the network for testing 0 uses the whole files')
-parser.add_argument('--batch_size',     type=int,   default=200,    help='Batch size, number of speakers per batch')
+parser.add_argument('--batch_size',     type=int,   default=50,    help='Batch size, number of speakers per batch')
 parser.add_argument('--max_seg_per_spk', type=int,  default=500,    help='Maximum number of utterances per speaker per epoch')
 parser.add_argument('--nDataLoaderThread', type=int, default=5,     help='Number of loader threads')
 parser.add_argument('--augment',        type=bool,  default=False,  help='Augment input')
@@ -36,7 +36,7 @@ parser.add_argument('--seed',           type=int,   default=10,     help='Seed f
 ## Training details
 parser.add_argument('--test_interval',  type=int,   default=1,     help='Test and save every [test_interval] epochs')
 parser.add_argument('--max_epoch',      type=int,   default=500,    help='Maximum number of epochs')
-parser.add_argument('--trainfunc',      type=str,   default="",     help='Loss function')
+parser.add_argument('--trainfunc',      type=str,   default="softmaxproto",     help='Loss function')
 
 ## Optimizer
 parser.add_argument('--optimizer',      type=str,   default="adam", help='sgd or adam')
@@ -50,7 +50,7 @@ parser.add_argument("--hard_prob",      type=float, default=0.5,    help='Hard n
 parser.add_argument("--hard_rank",      type=int,   default=10,     help='Hard negative mining rank in the batch, only for some loss functions')
 parser.add_argument('--margin',         type=float, default=0.1,    help='Loss margin, only for some loss functions')
 parser.add_argument('--scale',          type=float, default=30,     help='Loss scale, only for some loss functions')
-parser.add_argument('--nPerSpeaker',    type=int,   default=1,      help='Number of utterances per speaker per batch, only for metric learning based losses')
+parser.add_argument('--nPerSpeaker',    type=int,   default=2,      help='Number of utterances per speaker per batch, only for metric learning based losses')
 parser.add_argument('--nClasses',       type=int,   default=5994,   help='Number of speakers in the softmax layer, only for softmax-based losses')
 
 ## Evaluation parameters
@@ -66,7 +66,7 @@ parser.add_argument('--save_path',      type=str,   default="exps/exp1", help='P
 
 #Updated training data locations
 #training english
-parser.add_argument('--train_list',     type=str,   default="lists/train_list_E.txt",  help='Train list')
+parser.add_argument('--train_list',     type=str,   default="lists/train_list_Voxceleb2.txt",  help='Train list')
 parser.add_argument('--train_path',     type=str,   default="data/voxceleb2", help='Absolute path to the train set')
 
 ##training Tamil
@@ -83,16 +83,17 @@ parser.add_argument('--train_path',     type=str,   default="data/voxceleb2", he
 
 #testing English
 parser.add_argument('--test_path',     type=str,   default="data/voxceleb1",  help='test path')
-parser.add_argument('--test_list',      type=str,   default="lists/test_list_english.txt",   help='Evaluation list')
+parser.add_argument('--test_list',      type=str,   default="lists/VoxCeleb1_test.txt",   help='Evaluation list')
 
-#parser.add_argument('--musan_path',     type=str,   default="data/musan_split", help='Absolute path to the test set')
-#parser.add_argument('--rir_path',       type=str,   default="data/RIRS_NOISES/simulated_rirs", help='Absolute path to the test set')
+#Removed data augmentaions
+#parser.add_argument('--musan_path',     type=str,   default="", help='Absolute path to the test set')
+#parser.add_argument('--rir_path',       type=str,   default="", help='Absolute path to the test set')
 
 ## Model definition
-parser.add_argument('--n_mels',         type=int,   default=128,     help='Number of mel filterbanks')
+parser.add_argument('--n_mels',         type=int,   default=80,     help='Number of mel filterbanks')#Change the nmels from 128 to 80
 parser.add_argument('--log_input',      type=bool,  default=False,  help='Log input features')
-parser.add_argument('--model',          type=str,   default="",     help='Name of model definition')
-parser.add_argument('--encoder_type',   type=str,   default="SAP",  help='Type of encoder')
+parser.add_argument('--model',          type=str,   default="ResNetSE34V2",     help='Name of model definition')
+parser.add_argument('--encoder_type',   type=str,   default="ASP",  help='Type of encoder')
 parser.add_argument('--nOut',           type=int,   default=512,    help='Embedding size in the last FC layer')
 parser.add_argument('--sinc_stride',    type=int,   default=10,    help='Stride size of the first analytic filterbank layer of RawNet3')
 
@@ -100,7 +101,7 @@ parser.add_argument('--sinc_stride',    type=int,   default=10,    help='Stride 
 parser.add_argument('--eval',           dest='eval', action='store_true', help='Eval only')
 
 ## For xvector extraction only - added by @dimuthuanuraj
-parser.add_argument('--extract',           dest='extract', action='store_false', help='For xvector extraction');
+parser.add_argument('--extract',           dest='extract', action='store_true', help='For xvector extraction');
 
 
 ## Distributed and mixed precision training
@@ -216,7 +217,7 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
     ## x-vector extraction - by dimuthuanuraj
-    if args.xtract == True:
+    if args.extract == True:
         pytorch_total_params = sum(p.numel() for p in s.module.__S__.parameters())
 
         print('Total parameters: ', pytorch_total_params)
