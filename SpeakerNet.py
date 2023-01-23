@@ -311,8 +311,6 @@ class ModelTrainer(object):
 
             # Modified code by Anuraj
             # saving the embedding to npz format
-            print(em.shape)
-            print(em2.shape)
             em2 = numpy.vstack([em2, em])
 
             telapsed = time.time() - tstart
@@ -320,9 +318,7 @@ class ModelTrainer(object):
         # convert feat_list to numpy array
         numpy.save('embeddings_sinhala.npy', em2)
         print("Saved")
-        return None;
-        exit();
-
+        sys.exit()
         ## ===== ===== ===== ===== ===== ===== ===== =====
 
     ## Save parameters
