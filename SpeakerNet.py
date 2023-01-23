@@ -4,10 +4,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy, sys, random
-import time, itertools, importlib
+import numpy, math, pdb, sys, random
+import time, os, itertools, shutil, importlib
 
-from DatasetLoader import test_dataset_loader
+from numpy import savetxt  # Added by Anuraj
+from tuneThreshold import tuneThresholdfromScore
+# from DatasetLoader import test_dataset_loader
+from DatasetLoader import *
 from torch.cuda.amp import autocast, GradScaler
 
 
@@ -24,14 +27,15 @@ class WrappedModel(nn.Module):
 
 
 class SpeakerNet(nn.Module):
+
     def __init__(self, model, optimizer, trainfunc, nPerSpeaker, **kwargs):
-        super(SpeakerNet, self).__init__()
+        super(SpeakerNet, self).__init__();
 
-        SpeakerNetModel = importlib.import_module("models." + model).__getattribute__("MainModel")
-        self.__S__ = SpeakerNetModel(**kwargs)
+        SpeakerNetModel = importlib.import_module('models.' + model).__getattribute__('MainModel')
+        self.__S__ = SpeakerNetModel(**kwargs);
 
-        LossFunction = importlib.import_module("loss." + trainfunc).__getattribute__("LossFunction")
-        self.__L__ = LossFunction(**kwargs)
+        LossFunction = importlib.import_module('loss.' + trainfunc).__getattribute__('LossFunction')
+        self.__L__ = LossFunction(**kwargs);
 
         self.nPerSpeaker = nPerSpeaker
 
@@ -53,14 +57,15 @@ class SpeakerNet(nn.Module):
 
 
 class ModelTrainer(object):
+
     def __init__(self, speaker_model, optimizer, scheduler, gpu, mixedprec, **kwargs):
 
         self.__model__ = speaker_model
 
-        Optimizer = importlib.import_module("optimizer." + optimizer).__getattribute__("Optimizer")
+        Optimizer = importlib.import_module('optimizer.' + optimizer).__getattribute__('Optimizer')
         self.__optimizer__ = Optimizer(self.__model__.parameters(), **kwargs)
 
-        Scheduler = importlib.import_module("scheduler." + scheduler).__getattribute__("Scheduler")
+        Scheduler = importlib.import_module('scheduler.' + scheduler).__getattribute__('Scheduler')
         self.__scheduler__, self.lr_step = Scheduler(self.__optimizer__, **kwargs)
 
         self.scaler = GradScaler()
@@ -69,7 +74,7 @@ class ModelTrainer(object):
 
         self.mixedprec = mixedprec
 
-        assert self.lr_step in ["epoch", "iteration"]
+        assert self.lr_step in ['epoch', 'iteration']
 
     # ## ===== ===== ===== ===== ===== ===== ===== =====
     # ## Train network
@@ -77,72 +82,71 @@ class ModelTrainer(object):
 
     def train_network(self, loader, verbose):
 
-        self.__model__.train()
+        self.__model__.train();
 
-        stepsize = loader.batch_size
+        stepsize = loader.batch_size;
 
-        counter = 0
-        index = 0
-        loss = 0
-        top1 = 0
-        # EER or accuracy
+        counter = 0;
+        index = 0;
+        loss = 0;
+        top1 = 0;  # EER or accuracy
 
         tstart = time.time()
 
         for data, data_label in loader:
 
             data = data.transpose(1, 0)
+            print(type(data))
 
-            self.__model__.zero_grad()
+            self.__model__.zero_grad();
 
             label = torch.LongTensor(data_label).cuda()
 
             if self.mixedprec:
                 with autocast():
                     nloss, prec1 = self.__model__(data, label)
-                    print("label - ", label) #added by @dimuthuanuraj
-                    print("data - ", data) #added by @dimuthuanuraj
-                    
-                self.scaler.scale(nloss).backward()
-                self.scaler.step(self.__optimizer__)
-                self.scaler.update()
+
+                self.scaler.scale(nloss).backward();
+                self.scaler.step(self.__optimizer__);
+                self.scaler.update();
             else:
                 nloss, prec1 = self.__model__(data, label)
-                nloss.backward()
-                self.__optimizer__.step()
+                nloss.backward();
+                self.__optimizer__.step();
 
-            loss += nloss.detach().cpu().item()
-            top1 += prec1.detach().cpu().item()
-            counter += 1
-            index += stepsize
+            loss += nloss.detach().cpu().item();
+            top1 += prec1.detach().cpu().item();
+            counter += 1;
+            index += stepsize;
 
             telapsed = time.time() - tstart
             tstart = time.time()
 
             if verbose:
-                sys.stdout.write("\rProcessing {:d} of {:d}:".format(index, loader.__len__() * loader.batch_size))
-                sys.stdout.write("Loss {:f} TEER/TAcc {:2.3f}% - {:.2f} Hz ".format(loss / counter, top1 / counter, stepsize / telapsed))
-                sys.stdout.flush()
+                sys.stdout.write("\rProcessing {:d} of {:d}:".format(index, loader.__len__() * loader.batch_size));
+                sys.stdout.write("Loss {:f} TEER/TAcc {:2.3f}% - {:.2f} Hz ".format(loss / counter, top1 / counter,
+                                                                                    stepsize / telapsed));
+                sys.stdout.flush();
 
-            if self.lr_step == "iteration":
-                self.__scheduler__.step()
+            if self.lr_step == 'iteration': self.__scheduler__.step()
 
-        if self.lr_step == "epoch":
-            self.__scheduler__.step()
+        if self.lr_step == 'epoch': self.__scheduler__.step()
 
-        return (loss / counter, top1 / counter)
+        return (loss / counter, top1 / counter);
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
     ## Evaluate from list
     ## ===== ===== ===== ===== ===== ===== ===== =====
-    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10, **kwargs):
+
+    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10,
+                         **kwargs):
 
         if distributed:
             rank = torch.distributed.get_rank()
         else:
             rank = 0
 
-        self.__model__.eval()
+        self.__model__.eval();
 
         lines = []
         files = []
@@ -166,33 +170,32 @@ class ModelTrainer(object):
         else:
             sampler = None
 
-        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=nDataLoaderThread, drop_last=False, sampler=sampler)
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=nDataLoaderThread,
+            drop_last=False,
+            sampler=sampler
+        )
 
-        ## Extract features for every image --Modified by Dimuthu Anuraj--
-        em2 = numpy.empty([1, 512], dtype=float) #added by @dimuthuanuraj
+        ## Extract features for every image
         for idx, data in enumerate(test_loader):
             inp1 = data[0][0].cuda()
             with torch.no_grad():
                 ref_feat = self.__model__(inp1).detach().cpu()
-
-            em = numpy.array(ref_feat) #added by @dimuthuanuraj
-            em2 = numpy.vstack([em2, em]) #added by @dimuthuanuraj
-            print(ref_feat)
-            print(idx)
-            print(data)
-            print(ref_feat.shape)
-
             feats[data[1][0]] = ref_feat
             telapsed = time.time() - tstart
 
             if idx % print_interval == 0 and rank == 0:
                 sys.stdout.write(
-                    "\rReading {:d} of {:d}: {:.2f} Hz, embedding size {:d}".format(idx, test_loader.__len__(), idx / telapsed, ref_feat.size()[1])
-                )
+                    "\rReading {:d} of {:d}: {:.2f} Hz, embedding size {:d}".format(idx, test_loader.__len__(),
+                                                                                    idx / telapsed,
+                                                                                    ref_feat.size()[1]));
 
-        all_scores = []
-        all_labels = []
-        all_trials = []
+        all_scores = [];
+        all_labels = [];
+        all_trials = [];
 
         if distributed:
             ## Gather features from all GPUs
@@ -202,7 +205,7 @@ class ModelTrainer(object):
         if rank == 0:
 
             tstart = time.time()
-            print("")
+            print('')
 
             ## Combine gathered features
             if distributed:
@@ -213,11 +216,10 @@ class ModelTrainer(object):
             ## Read files and compute all scores
             for idx, line in enumerate(lines):
 
-                data = line.split()
+                data = line.split();
 
                 ## Append random label if missing
-                if len(data) == 2:
-                    data = [random.randint(0, 1)] + data
+                if len(data) == 2: data = [random.randint(0, 1)] + data
 
                 ref_feat = feats[data[1]].cuda()
                 com_feat = feats[data[2]].cuda()
@@ -226,25 +228,29 @@ class ModelTrainer(object):
                     ref_feat = F.normalize(ref_feat, p=2, dim=1)
                     com_feat = F.normalize(com_feat, p=2, dim=1)
 
-                dist = torch.cdist(ref_feat.reshape(num_eval, -1), com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
+                # dist = F.pairwise_distance(ref_feat.unsqueeze(-1), com_feat.unsqueeze(-1).transpose(0,2)).detach().cpu().numpy();
+                # dist = torch.cdist(ref_feat.reshape((num_eval, -1)), com_feat.reshape((num_eval, -1))).detach().cpu().numpy();
+                dist = torch.cdist(ref_feat.unsqueeze(0), com_feat.unsqueeze(0)).detach().cpu().numpy();
+                # dist = torch.cdist(ref_feat.reshape(num_eval, -1),com_feat.reshape(num_eval, -1)).detach().cpu().numpy() #original code
 
-                score = -1 * numpy.mean(dist)
+                score = -1 * numpy.mean(dist);
 
-                all_scores.append(score)
-                all_labels.append(int(data[0]))
+                all_scores.append(score);
+                all_labels.append(int(data[0]));
                 all_trials.append(data[1] + " " + data[2])
 
                 if idx % print_interval == 0:
                     telapsed = time.time() - tstart
-                    sys.stdout.write("\rComputing {:d} of {:d}: {:.2f} Hz".format(idx, len(lines), idx / telapsed))
-                    sys.stdout.flush()
+                    sys.stdout.write("\rComputing {:d} of {:d}: {:.2f} Hz".format(idx, len(lines), idx / telapsed));
+                    sys.stdout.flush();
 
-        return (all_scores, all_labels, all_trials)
+        return (all_scores, all_labels, all_trials);
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
     ## x vector extractor
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
+    #    def extractXvectors(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10, **kwargs):
     def extractXvectors(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10,
                         **kwargs):
         if distributed:
@@ -312,20 +318,19 @@ class ModelTrainer(object):
             telapsed = time.time() - tstart
 
         # convert feat_list to numpy array
-        numpy.save('embeddings_English1.npy', em2)
-        print("Saved embeddings")
+        numpy.save('embeddings_sinhala.npy', em2)
+        print("Saved")
         return None;
-    exit();
+        exit();
 
+        ## ===== ===== ===== ===== ===== ===== ===== =====
 
-
-    ## ===== ===== ===== ===== ===== ===== ===== =====
     ## Save parameters
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
     def saveParameters(self, path):
 
-        torch.save(self.__model__.module.state_dict(), path)
+        torch.save(self.__model__.module.state_dict(), path);
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
     ## Load parameters
@@ -333,30 +338,21 @@ class ModelTrainer(object):
 
     def loadParameters(self, path):
 
-        self_state = self.__model__.module.state_dict()
-        loaded_state = torch.load(path, map_location="cuda:%d" % self.gpu)
-        if len(loaded_state.keys()) == 1 and "model" in loaded_state:
-            loaded_state = loaded_state["model"]
-            newdict = {}
-            delete_list = []
-            for name, param in loaded_state.items():
-                new_name = "__S__."+name
-                newdict[new_name] = param
-                delete_list.append(name)
-            loaded_state.update(newdict)
-            for name in delete_list:
-                del loaded_state[name]
+        self_state = self.__model__.module.state_dict();
+        loaded_state = torch.load(path, map_location="cuda:%d" % self.gpu);
         for name, param in loaded_state.items():
-            origname = name
+            origname = name;
             if name not in self_state:
-                name = name.replace("module.", "")
+                name = name.replace("module.", "");
 
                 if name not in self_state:
-                    print("{} is not in the model.".format(origname))
-                    continue
+                    print("{} is not in the model.".format(origname));
+                    continue;
 
             if self_state[name].size() != loaded_state[origname].size():
-                print("Wrong parameter length: {}, model: {}, loaded: {}".format(origname, self_state[name].size(), loaded_state[origname].size()))
-                continue
+                print("Wrong parameter length: {}, model: {}, loaded: {}".format(origname, self_state[name].size(),
+                                                                                 loaded_state[origname].size()));
+                continue;
 
-            self_state[name].copy_(param)
+            self_state[name].copy_(param);
+
